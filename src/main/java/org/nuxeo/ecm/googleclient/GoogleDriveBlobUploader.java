@@ -27,8 +27,10 @@ import javax.faces.component.html.HtmlInputText;
 import javax.faces.context.FacesContext;
 import javax.faces.context.ResponseWriter;
 
+import com.google.api.client.auth.oauth2.Credential;
 import org.apache.commons.lang.StringUtils;
 import org.nuxeo.ecm.core.api.Blob;
+import org.nuxeo.ecm.core.api.NuxeoException;
 import org.nuxeo.ecm.core.blob.BlobManager;
 import org.nuxeo.ecm.platform.ui.web.component.file.InputFileChoice;
 import org.nuxeo.ecm.platform.ui.web.component.file.InputFileInfo;
@@ -56,11 +58,12 @@ public class GoogleDriveBlobUploader implements JSFBlobUploader {
     protected String clientId;
 
     public GoogleDriveBlobUploader() {
-        clientId = Framework.getProperty(CLIENT_ID_PROP);
-        if (StringUtils.isBlank(clientId)) {
+        try {
+            getGoogleDriveBlobProvider();
+        } catch (NuxeoException e) {
             // this exception is caught by JSFBlobUploaderDescriptor.getJSFBlobUploader
             // to mean that the uploader is not available because badly configured
-            throw new IllegalStateException("Missing value for property: " + CLIENT_ID_PROP);
+            throw new IllegalStateException(e);
         }
     }
 
@@ -86,6 +89,8 @@ public class GoogleDriveBlobUploader implements JSFBlobUploader {
         }
         HtmlInputText inputText = (HtmlInputText) facet;
 
+        String user = context.getExternalContext().getUserPrincipal().getName();
+
         // not ours to close
         @SuppressWarnings("resource")
         ResponseWriter writer = context.getResponseWriter();
@@ -101,8 +106,8 @@ public class GoogleDriveBlobUploader implements JSFBlobUploader {
         writer.writeAttribute("class", "button GoogleDrivePickerButton", null);
         String onButtonClick = onClick
                 + ";"
-                + String.format("new nuxeo.utils.GoogleDrivePicker('%s','%s','%s','%s','%s','%s')",
-            clientId, pickId, authId, inputId, infoId, getGoogleDomain());
+                + String.format("new nuxeo.utils.GoogleDrivePicker('%s','%s','%s','%s','%s','%s','%s')",
+            getClientId(), pickId, authId, inputId, infoId, getGoogleDomain(), getAccessToken(user));
         writer.writeAttribute("onclick", onButtonClick, null);
 
         writer.startElement("span", parent);
@@ -184,5 +189,22 @@ public class GoogleDriveBlobUploader implements JSFBlobUploader {
     protected String getGoogleDomain() {
         String domain = Framework.getProperty(GOOGLE_DOMAIN_PROP);
         return (domain != null) ? domain : "";
+    }
+    
+
+    protected String getClientId() {
+        String clientId = getGoogleDriveBlobProvider().getClientId();
+        return (clientId != null) ? clientId : "";
+    }
+
+    protected String getAccessToken(String user) throws IOException {
+        Credential credential = getGoogleDriveBlobProvider().getCredential(user);
+        if (credential != null) {
+            String accessToken = credential.getAccessToken();
+            if (accessToken != null) {
+                return accessToken;
+            }
+        }
+        return "";
     }
 }

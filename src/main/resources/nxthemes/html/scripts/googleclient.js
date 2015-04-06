@@ -9,13 +9,17 @@ nuxeo.utils = nuxeo.utils || {};
 // inputId: element id of input fields to save the doc id
 // infoId: element id of span to fill with doc info
 // domain: limit account picker to this domain
-nuxeo.utils.GoogleDrivePicker = function(clientId, pickId, authId, inputId, infoId, domain) {
+// token: a valid access token
+nuxeo.utils.GoogleDrivePicker = function(clientId, pickId, authId, inputId, infoId, domain, token) {
     this.clientId = clientId;
     this.pickId = pickId;
     this.authId = authId;
     this.inputId = inputId;
     this.infoId = infoId;
     this.domain = domain;
+    if (token) {
+      gapi.auth.setToken({access_token:token});
+    }
     gapi.load('picker', {
         'callback' : this.init.bind(this)
     });
@@ -24,9 +28,14 @@ nuxeo.utils.GoogleDrivePicker = function(clientId, pickId, authId, inputId, info
 nuxeo.utils.GoogleDrivePicker.prototype = {
 
     init : function() {
+      var token = gapi.auth.getToken();
+      if (token) {
+        this.onAuth(token);
+      } else {
         // try immediate first. if it fails, ask user to re-click the button
         var immediate = !this.isAskingForAuth();
         this.doAuth(immediate, this.checkAuth.bind(this));
+      }
     },
 
     isAskingForAuth : function() {

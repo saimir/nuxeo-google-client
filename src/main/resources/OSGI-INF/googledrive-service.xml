@@ -1,14 +1,27 @@
 <?xml version="1.0"?>
-<component name="org.nuxeo.ecm.googleclient.GoogleDriveComponent"
-  version="1.0.0">
+<component name="org.nuxeo.ecm.googleclient.GoogleDriveComponent" version="1.0.0">
 
   <require>org.nuxeo.ecm.core.blob.BlobManager</require>
+  <require>org.nuxeo.ecm.platform.oauth2.providers.OAuth2ServiceProviderRegistry</require>
 
   <documentation>
     Management of Google Drive configuration.
   </documentation>
 
   <implementation class="org.nuxeo.ecm.googleclient.GoogleDriveComponent" />
+
+  <extension-point name="configuration">
+    <documentation>
+      <code>
+        <configuration>
+          <clientId>CLIENT_ID</clientId>
+          <emailAddress>EMAIL</emailAddress>
+          <clientSecret>CLIENT_SECRET</clientSecret>
+        </configuration>
+      </code>
+    </documentation>
+    <object class="org.nuxeo.ecm.googleclient.GoogleDriveConfigurationDescriptor" />
+  </extension-point>
 
   <extension target="org.nuxeo.ecm.platform.ui.web.component.file.JSFBlobUploaderService" point="uploader">
     <uploader id="googledrive" order="20" class="org.nuxeo.ecm.googleclient.GoogleDriveBlobUploader" />

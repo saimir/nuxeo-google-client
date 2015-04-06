@@ -52,6 +52,8 @@ public class GoogleDriveBlobProvider implements ManagedBlobProvider {
 
     private final CredentialFactory credentialFactory;
 
+    private String clientId;
+
     public GoogleDriveBlobProvider(CredentialFactory credentialFactory) {
         this.credentialFactory = credentialFactory;
     }
@@ -187,5 +189,13 @@ public class GoogleDriveBlobProvider implements ManagedBlobProvider {
         return new Drive.Builder(httpTransport, jsonFactory, credential) //
         .setApplicationName(APPLICATION_NAME) // set application name to avoid a WARN
         .build();
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
+
+    public String getClientId() {
+        return clientId;
     }
 }
