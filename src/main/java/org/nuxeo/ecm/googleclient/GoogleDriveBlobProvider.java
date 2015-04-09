@@ -19,9 +19,10 @@ package org.nuxeo.ecm.googleclient;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collections;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.nuxeo.ecm.core.api.Blob;
@@ -119,10 +120,7 @@ public class GoogleDriveBlobProvider implements ManagedBlobProvider {
 
     @Override
     public InputStream getConvertedStream(ManagedBlob blob, String mimeType) throws IOException {
-        String user = getUser(blob);
-        String fileId = getFileId(blob);
-        Drive service = getService(user);
-        File file = service.files().get(fileId).execute();
+        File file = getFile(blob);
         Map<String, String> exportLinks = file.getExportLinks();
         String url = null;
         if (exportLinks != null) {
@@ -131,18 +129,23 @@ public class GoogleDriveBlobProvider implements ManagedBlobProvider {
         if (url == null) {
             return null;
         }
-        HttpResponse resp = service.getRequestFactory().buildGetRequest(new GenericUrl(url)).execute();
+        String user = getUser(blob);
+        HttpResponse resp = doGet(user, url);
         return resp.getContent();
     }
 
     @Override
-    public List<String> getAvailableConversions(ManagedBlob blob) throws IOException {
-        String user = getUser(blob);
-        String fileId = getFileId(blob);
-        Drive service = getService(user);
-        File file = service.files().get(fileId).execute();
+    public Map<String, URI> getAvailableConversions(ManagedBlob blob) throws IOException {
+        File file = getFile(blob);
         Map<String, String> exportLinks = file.getExportLinks();
-        return exportLinks == null ? Collections.emptyList() : new ArrayList<>(exportLinks.keySet());
+        if (exportLinks == null) {
+            return Collections.emptyMap();
+        }
+        Map<String, URI> conversions = new HashMap<>();
+        for (String mimeType : exportLinks.keySet()) {
+            conversions.put(mimeType, asURI(exportLinks.get(mimeType)));
+        }
+        return conversions;
     }
 
     // other links available in the file metadata:
@@ -160,7 +163,7 @@ public class GoogleDriveBlobProvider implements ManagedBlobProvider {
     public Blob getBlob(String fileInfo) throws IOException {
         String user = getUser(fileInfo);
         String fileId = getFileId(fileInfo);
-        File file = getService(user).files().get(fileId).execute();
+        File file = getFile(user, fileId);
         String key = String.format("%s:%s:%s", GoogleDriveComponent.GOOGLE_DRIVE_PREFIX, user, fileId);
         String filename = file.getOriginalFilename();
         if (filename == null) {
@@ -172,7 +175,12 @@ public class GoogleDriveBlobProvider implements ManagedBlobProvider {
         blobInfo.encoding = null; // TODO extract from mimeType
         blobInfo.filename = filename;
         blobInfo.length = file.getFileSize();
-        blobInfo.digest = file.getMd5Checksum();
+        // etag for native docs and md5 for everything else
+        String digest = file.getMd5Checksum();
+        if (digest == null) {
+            digest = file.getEtag();
+        }
+        blobInfo.digest = digest;
         return new SimpleManagedBlob(blobInfo, this);
     }
 
@@ -187,5 +195,39 @@ public class GoogleDriveBlobProvider implements ManagedBlobProvider {
         return new Drive.Builder(httpTransport, jsonFactory, credential) //
         .setApplicationName(APPLICATION_NAME) // set application name to avoid a WARN
         .build();
+    }
+
+    protected File getFile(ManagedBlob blob) throws IOException {
+        String user = getUser(blob);
+        String fileId = getFileId(blob);
+        return getFile(user, fileId);
+    }
+
+    protected File getFile(String user, String fileId) throws IOException {
+        return getService(user).files().get(fileId).execute();
+    }
+
+    /**
+     * Executes a GET request with the user's credentials
+     *
+     * @return a {@link HttpResponse}
+     */
+    protected HttpResponse doGet(String user, String url) throws IOException {
+        return getService(user).getRequestFactory().buildGetRequest(new GenericUrl(url)).execute();
+    }
+
+    /**
+     * Parse a {@link URI}.
+     *
+     * @return the {@link URI} or null if it fails
+     */
+    private URI asURI(String link) {
+        URI uri = null;
+        try {
+            uri = new URI(link);
+        } catch (URISyntaxException e) {
+            //
+        }
+        return uri;
     }
 }
