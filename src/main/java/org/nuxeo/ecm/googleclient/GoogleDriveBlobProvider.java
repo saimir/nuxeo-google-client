@@ -105,6 +105,16 @@ public class GoogleDriveBlobProvider implements ManagedBlobProvider {
     }
 
     @Override
+    public URI getURI(ManagedBlob blob) throws IOException {
+        File file = getFile(blob);
+        String url = file.getWebContentLink();
+        if (url == null) {
+            url = file.getAlternateLink();
+        }
+        return asURI(url);
+    }
+    
+    @Override
     public InputStream getStream(ManagedBlob blob) throws IOException {
         String user = getUser(blob);
         String fileId = getFileId(blob);
